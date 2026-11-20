@@ -42,10 +42,11 @@ func (cmd *Cmd) PrintUsage()
 - `-h` / 无类名 → 打印用法后退出
 - 否则临时打印解析结果（classpath / xjre / class / args），占位提示「类加载在 M02 实现」
 
-### 3. 版本号常量 — `internal/version.go`
+### 3. 版本号变量 — `internal/version.go`
 
 ```go
-const VERSION = "0.0.1"
+// 用 var 而非 const：ldflags -X 注入只作用于变量。
+var VERSION = "0.0.1"
 ```
 
 （M10 交叉编译时用 `-ldflags "-X minijvm/internal.VERSION=..."` 注入）
