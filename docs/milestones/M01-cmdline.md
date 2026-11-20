@@ -17,20 +17,30 @@ M00（go.mod 就位）。
 ### 1. Cmd 参数结构 — `internal/cmd.go`
 
 ```go
+const DefaultStackSize = 512 * 1024 // -Xss 未指定时的默认栈大小
+
 type Cmd struct {
-    HelpFlag    bool     // -h / -help
-    VersionFlag bool     // -version
-    CpOption    string   // -cp / -classpath（Windows 分隔符 ';')
-    XjreOption  string   // -Xjre <path>  指向 E:\tools\jdk8\jre\lib
-    XssOption   string   // -Xss <size>   栈大小，如 -Xss1m / -Xss512k
-    VerboseClassFlag bool // -verbose:class（M14 用）
-    Class       string   // 主类全限定名
-    Args        []string // 传给 main 的参数
+    HelpFlag         bool     // -h / -help
+    VersionFlag      bool     // -version
+    CpOption         string   // -cp / -classpath（分隔符取 filepath.ListSeparator）
+    XjreOption       string   // -Xjre <path>，JDK8 的 jre/lib 目录（rt.jar 类库来源）
+    XssOption        string   // -Xss 原始值（保留）
+    XssBytes         int      // -Xss 解析后的字节数；未指定 = DefaultStackSize
+    VerboseClassFlag bool     // -verbose:class
+    Class            string   // 主类全限定名
+    Args             []string // 传给 main 的参数
 }
 
-func ParseCmd() *Cmd
+func ParseCmd() *Cmd                     // = ParseCmdFrom(os.Args[1:])
+func ParseCmdFrom(args []string) *Cmd    // 可测试接缝（内部先做 normalizeXss）
+func ParseXss(s string) (int, error)     // "1m"/"512k"/"1024"（后缀大小写均可）→ 字节；非法值报错
 func (cmd *Cmd) PrintUsage()
 ```
+
+- `-Xss` 非法值：向 stderr 打印**包含 `invalid -Xss`** 的友好信息（建议附合法示例）并 `os.Exit(1)`
+- `ParseXss` 合法域：正整数（字节）或 m/k 后缀（大小写均可）；`""`、`"0"`、负数、未知后缀均报错
+- java 语义：主类名之后的一切是程序参数，不再作为 flag 解析
+- 测试：`internal/cmd_test.go`（单元）+ `cmd/minijvm/main_test.go`（集成，子进程验证退出码）
 
 - 用标准库 `flag` 包实现，自定义 flag 顺序支持（java 允许 flag 与类名混排，M01 先按 flag 包默认规则即可）
 - `-Xss` 解析成字节数：支持 `1m`、`512k`、纯数字；非法值报错退出
