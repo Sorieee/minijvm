@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Cmd 保存 java 风格的命令行参数（设计见 docs/milestones/M01-cmdline.md）。
@@ -38,7 +39,7 @@ func ParseCmd() *Cmd {
 	fs.BoolVar(&cmd.VerboseClassFlag, "verbose:class", false, "log every loaded class")
 	fs.Usage = cmd.PrintUsage
 
-	args := os.Args[1:]
+	args := normalizeXss(os.Args[1:])
 	for {
 		fs.Parse(args) // 停在第一个非 flag 参数处
 		rest := fs.Args()
@@ -54,6 +55,20 @@ func ParseCmd() *Cmd {
 		cmd.Args = rest[1:]
 		return cmd
 	}
+}
+
+// normalizeXss 把 -Xss1m 这类「值紧跟参数名」的写法改写为 -Xss=1m。
+// java 命令支持紧凑写法，但 Go 的 flag 包只认 -flag value / -flag=value。
+func normalizeXss(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if strings.HasPrefix(a, "-Xss") && a != "-Xss" && !strings.HasPrefix(a, "-Xss=") {
+			out = append(out, "-Xss="+strings.TrimPrefix(a, "-Xss"))
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 // PrintUsage 打印用法说明。
