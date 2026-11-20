@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-MiniJVM 是一个**学习型**的字节码执行引擎：解释执行 Java 8 字节码（类文件版本 ≤ 52），能运行真实的 Java 控制台程序。不追求性能、不追求 JVM 规范的完整实现（不做 JIT、不做 GC、不支持 invokedynamic）。
+MiniJVM 是一个**学习型**的字节码执行引擎：解释执行 Java 8 字节码（类文件版本 ≤ 52），能运行真实的 Java 控制台程序。不追求性能、不追求 JVM 规范的完整实现（不做 JIT、不支持 invokedynamic）。GC 为超出书范围的扩展：自研标记-清除（M15），分代收集列为 stretch。
 
 核心设计思想（与书一致）：**JVM 不自带类库**。`java.lang.Object`、`java.lang.String`、`java.util.ArrayList` 等直接从真实 JDK 8 的 `rt.jar` 加载，由解释器执行其中的纯 Java 字节码。这样无需手写类库，就能跑"真"Java 程序；需要解释器亲手实现的只有 native 方法（如 `Object.hashCode`、`FileOutputStream.writeBytes`）。
 
@@ -116,12 +116,21 @@ loop:
 - 字符串：JDK8 `String` 布局（`char[] value` + `int hash`）。`ldc` 字符串常量 → 构造 String 对象 + char 数组对象；M12 加 `StringPool`（Go `map[string]*Object` + 锁）与 `String.intern` native
 - 数组：`newarray/anewarray/multianewarray`（M07）；M13 数组类为合成 `heap.Class`（名字 `[I` / `[Ljava/lang/String;`，superClass = Object，实现 Cloneable/Serializable），支持数组 clone 与 `java.lang.reflect.Array` natives
 
+### 4.8 垃圾回收（M15 实装，超出书范围）
+
+- **对象注册表 + 标记-清除**：分配点统一注册 `*Object` 并累计 `usedBytes`；`Slot.Ref` 保持 Go 指针，指令层零改动；GC 从注册表注销死对象，最终内存释放交宿主 GC
+- **根集**：全部线程帧（局部变量表+操作数栈）→ 全部已加载类静态槽 → StringPool → PendingException → 永生对象（JClass、类元数据永不回收）
+- **触发**：分配路径同步触发（STW）；回收后仍超 `-Xmx` → `OutOfMemoryError`；`System.gc()` 显式触发；`-verbose:gc` 打印统计
+- **stretch**：分代收集（复制 + 写屏障 + 记忆集，`putfield/putstatic/aastore` 预留 `heap.WriteRef` 接缝）、Reference 类型、finalize()
+
 ## 5. 与书的两处调整
 
 1. **println 哨兵桥接（M06 引入，M11 移除）**：书直到第 11 章才能 println。为让 M06–M10 里程碑有可见输出，`getstatic java/lang/System.out` 特判返回一个哨兵对象，`invokevirtual println` 命中哨兵直接由 Go 输出。书的第 9 章对 `Throwable.printStackTrace` 用的就是同类桥接手法。
 2. **M05 增加临时 `-Xtest` 模式**：加载类 → 调用 `static int test()` → 打印返回值。让 M05 纯计算阶段就能端到端验证（书此时只能单测/调试），M06 桥接上线后保留作调试工具，M14 后退役。
 
-其余与书一致：不做 GC（对象是 Go 结构体，靠宿主 GC）、不做 JIT、不实现 invokedynamic。
+**超出书范围的扩展**：M15 自研 GC（书依赖 Go 宿主 GC，jvmgo 只把 GC 列为练习方向）。我们的方案：对象注册表 + 标记-清除，`Slot.Ref` 保持 Go 指针、指令层零改动；GC 决定对象生死并维护 `-Xmx` 账本，最终内存释放交给宿主 GC。详见 [milestones/M15-gc.md](milestones/M15-gc.md)。
+
+其余与书一致：不做 JIT、不实现 invokedynamic。
 
 ## 6. 目录结构（目标形态）
 
@@ -153,6 +162,7 @@ minijvm/
 | `System.<clinit>` 触发链深（牵出 PrintStream/FileOutputStream/sun.misc 等） | M11 前哨兵桥接规避；M11 按"实际触发链"逐个补 native，跑通即收敛 |
 | 循环 import（rtda ↔ heap） | heap 包自足（Slot 定义在 heap），依赖单向 rtda → heap |
 | JDK8 rt.jar 类触达未实现路径（图形/网络/反射深层） | 只跑控制台程序；反射只实现 Array 相关子集 |
+| GC 根集遗漏 → 活对象误回收（悬垂崩溃） | 根集清单化（见 §4.8）；每个根配「回收后仍存活」单测；JClass/字符串池/PendingException 是最易漏的三处 |
 | invokedynamic 不支持 | 测试程序 `--release 8` + 避免 lambda/方法引用 |
 | Long/Double 双槽、switch 4 字节对齐等字节码细节坑 | M03/M05 用 javap 对拍 + 单测覆盖 |
 | Windows 与书的差异（classpath 分隔符 `;`、路径分隔符） | 全程用 `filepath.ListSeparator`、`filepath.Join`，不硬编码 `/` `:` |

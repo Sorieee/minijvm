@@ -6,7 +6,8 @@
 
 - 用 Go 实现解释执行 Java 8 字节码（类文件 ≤ v52）的迷你 JVM
 - 核心类库复用 JDK 8 `rt.jar`，覆盖《自己动手写Java虚拟机》全部 14 章
-- 不做：JIT、GC、invokedynamic、图形/网络类库路径
+- **扩展里程碑 M15：自研 GC**（标记-清除 + `-Xmx` + OOM；书未实现 GC，分代收集为 stretch）
+- 不做：JIT、invokedynamic、图形/网络类库路径
 
 ## 2. Phase 0：环境准备（M00）
 
@@ -36,6 +37,7 @@
 | M12 | [字符串](milestones/M12-string.md) | 第 12 章 | StringPool、intern | 拼接/==/intern 程序 |
 | M13 | [数组](milestones/M13-array.md) | 第 13 章 | 数组类、clone、reflect.Array natives | 多维数组/clone/反射程序 |
 | M14 | [系统类加载器](milestones/M14-bootclasspath.md) | 第 14 章 | BootstrapClassLoader、委派模型 | ArrayList/HashMap 程序 + 全量回归 |
+| M15 | [垃圾回收](milestones/M15-gc.md) | 书外扩展 | 对象注册表 + 标记-清除、`-Xmx`、OOM、`-verbose:gc`、`System.gc()` | 回收正确性/OOM/环引用用例 + 全量回归 |
 
 每个里程碑：**讲解 → TDD 实现 → 测试通过 → commit + tag（mXX）→ README 进度更新**。
 
@@ -47,6 +49,7 @@
 - `rtda`：操作数栈 push/pop、long/double 双槽、局部变量读写、栈深度限制
 - `heap`：方法描述符解析、类引用解析
 - `instructions`：手工构造 code 字节 → 跑解释器 → 断言栈顶结果（M05 起持续补充）
+- `heap/gc`（M15）：回收正确性（可达性保持/环引用/继承链 ref 字段）、OOM、`-verbose:gc` 行格式
 
 ```bash
 go test ./... -cover
@@ -91,3 +94,4 @@ HelloWorld、递归 fib、继承多态、try/catch/finally、字符串、二维�
 | Windows 差异（classpath `;`、路径） | `filepath.ListSeparator` 全程统一 |
 | invokedynamic | `--release 8` + 避免 lambda |
 | 反射/深层类库路径 | 只实现 Array 反射子集，只跑控制台程序 |
+| GC 根集遗漏 → 活对象误回收 | 根集清单化（M15 文档 §4）；每个根配「回收后仍存活」单测 |
