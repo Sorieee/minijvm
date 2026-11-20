@@ -1,0 +1,22 @@
+# Go 构建产物
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# 测试编译产物（.java 源码提交，编译输出不提交）
+tests/classes/
+tests/out/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 临时文件
+*.log
+.DS_Store
+
+# 本地会话产物
+.zcode/
