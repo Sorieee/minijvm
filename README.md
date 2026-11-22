@@ -20,7 +20,7 @@
 |--------|------|-----------|------|
 | M00 | 环境准备 | - | ✅ 完成（Go 1.27.4 + Temurin 8u512b09） |
 | M01 | 命令行工具 | 第 1 章 | ⬜ 未开始 |
-| M02 | 搜索 class 文件 | 第 2 章 | ⬜ 未开始 |
+| M02 | 搜索 class 文件 | 第 2 章 | 🔨 进行中（骨架就绪，待实现） |
 | M03 | 解析 class 文件 | 第 3 章 | ⬜ 未开始 |
 | M04 | 运行时数据区 | 第 4 章 | ⬜ 未开始 |
 | M05 | 指令集和解释器 | 第 5 章 | ⬜ 未开始 |
@@ -38,11 +38,12 @@
 
 ## 环境要求
 
-> 已就绪（M00 完成，2026-11-20）：Go 1.27.4（MSI，新终端 PATH 自动生效）、
-> Temurin 8u512b09（`E:\tools\jdk8`，仅作 rt.jar 类库来源，未进 PATH）、JDK 21（系统已有）。
+> 已就绪（2026-11-23，本机）：Go 1.27.4（`C:\Program Files\Go`，系统 PATH），
+> Temurin 17.0.20.1（`E:\tools\jdk-17.0.20.1+1`，javac 用前先 `source /e/tools/env.sh`），
+> Temurin 8u512b09（`E:\tools\jdk8`，仅作 rt.jar 类库来源，未进 PATH）。
 
 - Go ≥ 1.21
-- JDK 21+（仅用 `javac --release 8` 编译测试程序）
+- JDK 9+（仅用 `javac --release 8` 编译测试程序；本机用 JDK 17，已验证产出 v52）
 - JDK 8 / Temurin 8（仅作 `rt.jar` 类库来源，不必进 PATH）
 
 详见 [docs/milestones/M00-environment.md](docs/milestones/M00-environment.md)。
