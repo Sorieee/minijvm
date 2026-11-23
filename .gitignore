@@ -8,6 +8,7 @@ dist/
 # 测试编译产物（.java 源码提交，编译输出不提交）
 tests/classes/
 tests/out/
+internal/classfile/testdata/
 
 # IDE
 .idea/

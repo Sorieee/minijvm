@@ -79,6 +79,8 @@ func locateMainClass(cmd *internal.Cmd) error {
 		return err
 	}
 
+	// TODO(M03): 用 classfile.Parse(data) 解析类文件；-verbose:class 时打印
+	// 「Parsed: <ClassName> (super=<SuperClassName>, methods=<n>)」。
 	fmt.Printf("Found class: %s => %s (%d bytes)\n", cmd.Class, hit.String(), len(data))
 	return nil
 }
