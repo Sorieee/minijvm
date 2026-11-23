@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+// DefaultLogLevel 是 -Xlog 未指定时的默认日志级别（与 main 的
+// -verbose:class 提升判断共用，避免字面量散落）。
+const DefaultLogLevel = "info"
+
 // Cmd 保存 java 风格的命令行参数（设计见 docs/milestones/M01-cmdline.md）。
 type Cmd struct {
 	HelpFlag         bool     // -h / -help
@@ -16,6 +20,7 @@ type Cmd struct {
 	CpOption         string   // -cp / -classpath（分隔符取 filepath.ListSeparator）
 	XjreOption       string   // -Xjre <path>，JDK8 的 jre/lib 目录（rt.jar 类库来源）
 	XssOption        string   // -Xss <size>，如 1m / 512k / 纯数字字节
+	LogLevel         string   // -Xlog <level>，日志级别 debug|info|warn|error（默认 info）
 	VerboseClassFlag bool     // -verbose:class
 	Class            string   // 主类全限定名（com/foo/Bar）
 	Args             []string // 传给 main 的参数
@@ -36,6 +41,7 @@ func ParseCmd() *Cmd {
 	fs.StringVar(&cmd.CpOption, "classpath", "", "same as -cp")
 	fs.StringVar(&cmd.XjreOption, "Xjre", "", "path to JDK8 jre/lib (runtime class library)")
 	fs.StringVar(&cmd.XssOption, "Xss", "", "thread stack size, e.g. 1m / 512k / bytes")
+	fs.StringVar(&cmd.LogLevel, "Xlog", DefaultLogLevel, "log level: debug|info|warn|error")
 	fs.BoolVar(&cmd.VerboseClassFlag, "verbose:class", false, "log every loaded class")
 	fs.Usage = cmd.PrintUsage
 
@@ -82,6 +88,7 @@ Options:
   -classpath <path>  same as -cp
   -Xjre <path>       JDK8 jre/lib directory (runtime class library source)
   -Xss <size>        thread stack size, e.g. 1m / 512k / plain bytes
+  -Xlog <level>      log level: debug|info|warn|error (default info)
   -verbose:class     log every loaded class
 `, filepath.ListSeparator)
 }

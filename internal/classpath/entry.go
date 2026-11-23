@@ -1,7 +1,11 @@
 // Entry 抽象与构造分派（M02 任务 1，对应书 2.1–2.2 节）。
 package classpath
 
-import "errors"
+import (
+	"errors"
+	"path/filepath"
+	"strings"
+)
 
 // ErrClassNotFound 是「类未找到」的统一哨兵错误。
 //
@@ -31,7 +35,12 @@ type Entry interface {
 // 每段交给 newSingleEntry 分派；多段包成 *CompositeEntry，单段直接返回该实现。
 // 空字符串按 java 语义处理为当前目录 "."（也可在此处归一化，见 Classpath.Parse）。
 func NewEntry(pathList string) Entry {
-	panic("TODO(M02): not implemented")
+	paths := strings.Split(pathList, string(filepath.ListSeparator))
+	if len(paths) == 1 {
+		// 单段直接返回该实现，不包一层 Composite（契约见上）。
+		return newSingleEntry(paths[0])
+	}
+	return newCompositeEntryByStrings(paths)
 }
 
 // newSingleEntry 把单段路径分派到具体实现：
@@ -40,5 +49,13 @@ func NewEntry(pathList string) Entry {
 //	以 .jar / .zip 结尾（ToLowerCase 后判断，兼容 .JAR）→ newZipEntry
 //	其余 → newDirEntry
 func newSingleEntry(path string) Entry {
-	panic("TODO(M02): not implemented")
+	if strings.HasSuffix(path, "*") {
+		return newWildcardEntry(path)
+	}
+	// 后缀 ToLower 后判断，兼容 rt.JAR / lib.Zip 等大小写变体；
+	// wildcard 展开产物是磁盘真实文件名，也会再次经过这里分派。
+	if ext := strings.ToLower(filepath.Ext(path)); ext == ".jar" || ext == ".zip" {
+		return newZipEntry(path)
+	}
+	return newDirEntry(path)
 }

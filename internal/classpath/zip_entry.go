@@ -3,6 +3,8 @@ package classpath
 
 import (
 	"archive/zip"
+	"fmt"
+	"io"
 	"path/filepath"
 )
 
@@ -61,7 +63,24 @@ func (e *ZipEntry) ensureOpen() error {
 //   - 命中则 f.Open() 后 io.ReadAll（zip.File 每次调用 Open 返回新 reader，
 //     同一条目可重复读）
 func (e *ZipEntry) ReadClass(className string) ([]byte, Entry, error) {
-	panic("TODO(M02): not implemented")
+	if err := e.ensureOpen(); err != nil {
+		return nil, nil, err
+	}
+	f, ok := e.entries[className+".class"]
+	if !ok {
+		// 类未找到 = 正常业务分支：包装哨兵错误并附上下文（entry.go 约定）。
+		return nil, nil, fmt.Errorf("%w: %s in %s", ErrClassNotFound, className, e.zipName)
+	}
+	open, err := f.Open()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer open.Close()
+	data, err := io.ReadAll(open)
+	if err != nil {
+		return nil, nil, err
+	}
+	return data, e, nil
 }
 
 // String 返回 jar/zip 文件路径。
