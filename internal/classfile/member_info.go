@@ -21,26 +21,64 @@ type MemberInfo struct {
 // 布局：u2 access_flags + u2 name_index + u2 descriptor_index +
 // u2 attributes_count + attributes。
 func readMemberInfo(r *ClassReader) (MemberInfo, error) {
-	panic("TODO(M03): not implemented")
+	accessFlags, err := r.ReadUint16()
+	if err != nil {
+		return MemberInfo{}, err
+	}
+	nameIndex, err := r.ReadUint16()
+	if err != nil {
+		return MemberInfo{}, err
+	}
+	descriptorIndex, err := r.ReadUint16()
+	if err != nil {
+		return MemberInfo{}, err
+	}
+	attributes, err := readAttributes(r)
+	if err != nil {
+		return MemberInfo{}, err
+	}
+
+	return MemberInfo{
+		CP:          r.cp,
+		AccessFlags: accessFlags,
+		Name:        r.cp.GetUtf8(nameIndex),
+		Descriptor:  r.cp.GetUtf8(descriptorIndex),
+		Attributes:  attributes,
+	}, nil
 }
 
 // CodeAttribute 返回该方法的 Code 属性；没有则返回 nil。
 //
 // 只有方法才有 Code 属性；字段调此方法恒返回 nil。
 func (mi *MemberInfo) CodeAttribute() *CodeAttribute {
-	panic("TODO(M03): not implemented")
+	for _, attr := range mi.Attributes {
+		if code, ok := attr.(*CodeAttribute); ok {
+			return code
+		}
+	}
+	return nil
 }
 
 // ConstantValueAttribute 返回该成员的 ConstantValue 属性；没有则返回 nil。
 //
 // 只有「static final」字段才有（编译期常量）；方法恒为 nil。
 func (mi *MemberInfo) ConstantValueAttribute() *ConstantValueAttribute {
-	panic("TODO(M03): not implemented")
+	for _, attr := range mi.Attributes {
+		if constant, ok := attr.(*ConstantValueAttribute); ok {
+			return constant
+		}
+	}
+	return nil
 }
 
 // ExceptionsAttribute 返回该方法的 Exceptions 属性；没有则返回 nil。
 //
 // 只有「throws 子句」的方法才有（且可能为空表）。
 func (mi *MemberInfo) ExceptionsAttribute() *ExceptionsAttribute {
-	panic("TODO(M03): not implemented")
+	for _, attr := range mi.Attributes {
+		if exceptions, ok := attr.(*ExceptionsAttribute); ok {
+			return exceptions
+		}
+	}
+	return nil
 }

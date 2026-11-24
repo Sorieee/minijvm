@@ -15,9 +15,23 @@ type ExceptionsAttribute struct {
 func (a *ExceptionsAttribute) Name() string { return "Exceptions" }
 
 // Length 返回属性内容长度（u4）。
-func (a *ExceptionsAttribute) Length() uint32 { panic("TODO(M03): not implemented") }
+func (a *ExceptionsAttribute) Length() uint32 {
+	return 2 + 2*uint32(len(a.ExceptionIndexTable))
+}
 
 // readInfo 读取 u2 数量 + u2 索引表。
 func (a *ExceptionsAttribute) readInfo(r *ClassReader) error {
-	panic("TODO(M03): not implemented")
+	attLen, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	exceptionIndexTable := make([]uint16, attLen)
+	for i := uint16(0); i < attLen; i++ {
+		exceptionIndexTable[i], err = r.ReadUint16()
+		if err != nil {
+			return err
+		}
+	}
+	a.ExceptionIndexTable = exceptionIndexTable
+	return nil
 }

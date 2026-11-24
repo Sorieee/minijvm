@@ -53,7 +53,104 @@ type ClassFile struct {
 //
 // 版本校验：major_version > 52 时应报错（本项目只支持 Java 8 及更早）。
 func Parse(classData []byte) (*ClassFile, error) {
-	panic("TODO(M03): not implemented")
+	r := NewClassReader(classData)
+
+	magicValue, err := r.ReadUint32()
+	if err != nil {
+		return nil, err
+	}
+	if magicValue != magic {
+		return nil, fmt.Errorf("%w: 非法魔数 %08X（偏移 0）", ErrClassFormat, magicValue)
+	}
+	minorVersion, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	majorVersion, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	if majorVersion > 52 { // 本项目支持 Java 8 及更早
+		return nil, fmt.Errorf("%w: 不支持的 major version %d（偏移 %d）",
+			ErrClassFormat, majorVersion, r.Pos()-2)
+	}
+
+	constantPool, err := readConstantPool(r)
+	if err != nil {
+		return nil, err
+	}
+	// 成员和属性解析要靠 reader 回查常量池索引，必须在读它们之前回填。
+	r.cp = constantPool
+
+	accessFlags, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	thisClass, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	superClass, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+
+	interfaceCount, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	interfaces := make([]uint16, interfaceCount)
+	for i := 0; i < int(interfaceCount); i++ {
+		index, err := r.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+		interfaces[i] = index
+	}
+
+	fieldCount, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	fields := make([]MemberInfo, fieldCount)
+	for i := 0; i < int(fieldCount); i++ {
+		field, err := readMemberInfo(r)
+		if err != nil {
+			return nil, err
+		}
+		fields[i] = field
+	}
+
+	methodCount, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	methods := make([]MemberInfo, methodCount)
+	for i := 0; i < int(methodCount); i++ {
+		method, err := readMemberInfo(r)
+		if err != nil {
+			return nil, err
+		}
+		methods[i] = method
+	}
+
+	attributes, err := readAttributes(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ClassFile{
+		MinorVersion: minorVersion,
+		MajorVersion: majorVersion,
+		ConstantPool: constantPool,
+		AccessFlags:  accessFlags,
+		ThisClass:    thisClass,
+		SuperClass:   superClass,
+		Interfaces:   interfaces,
+		Fields:       fields,
+		Methods:      methods,
+		Attributes:   attributes,
+	}, nil
 }
 
 // ClassName 返回本类的内部形式类名（如 "java/lang/Object"）。

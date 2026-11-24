@@ -20,5 +20,10 @@ func (a *ConstantValueAttribute) Length() uint32 { return 2 }
 
 // readInfo 读取 u2 constantvalue_index。
 func (a *ConstantValueAttribute) readInfo(r *ClassReader) error {
-	panic("TODO(M03): not implemented")
+	valIndex, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	a.ConstantValueIndex = valIndex
+	return nil
 }

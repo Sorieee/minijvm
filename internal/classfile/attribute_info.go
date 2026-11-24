@@ -30,14 +30,68 @@ type AttributeInfo interface {
 // name 与 length 由调用方（readAttributes）从属性表里读出后传入，
 // 这样未知属性的跳过长度也由调用方统一掌控。
 func readAttributeInfo(r *ClassReader, name string, length uint32) (AttributeInfo, error) {
-	panic("TODO(M03): not implemented")
+	var attr AttributeInfo
+	switch name {
+	case "Code":
+		attr = &CodeAttribute{attrLength: length}
+	case "ConstantValue":
+		attr = &ConstantValueAttribute{}
+	case "SourceFile":
+		attr = &SourceFileAttribute{}
+	case "Exceptions":
+		attr = &ExceptionsAttribute{}
+	case "LineNumberTable":
+		attr = &LineNumberTableAttribute{}
+	default:
+		attr = &UnknownAttribute{AttrName: name, AttrLength: length}
+	}
+
+	start := r.Pos()
+	if err := attr.readInfo(r); err != nil {
+		return nil, err
+	}
+	if got := uint32(r.Pos() - start); got != length {
+		return nil, errUnexpectedAttribute(name, length, got)
+	}
+	return attr, nil
 }
 
 // readAttributes 读取整个属性表（u2 count + count 个属性条目）。
 //
 // 类、字段、方法、Code 属性内部都复用这个函数。
+//
+// 本函数只读每条属性的通用头（u2 name_index + u4 length），解析属性名、
+// 消费内容字节与严格长度校验都交给 readAttributeInfo——避免两处重复
+// 推进 reader 造成错位。
 func readAttributes(r *ClassReader) ([]AttributeInfo, error) {
-	panic("TODO(M03): not implemented")
+	count, err := r.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+
+	attrs := make([]AttributeInfo, 0, count)
+	for i := 0; i < int(count); i++ {
+		nameIndex, err := r.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+		length, err := r.ReadUint32()
+		if err != nil {
+			return nil, err
+		}
+
+		name := attributeNameToString(r.cp, nameIndex)
+		if name == "" {
+			return nil, fmt.Errorf("%w: 偏移 %d 处属性名索引 %d 无效",
+				ErrClassFormat, r.Pos()-6, nameIndex)
+		}
+		attr, err := readAttributeInfo(r, name, length)
+		if err != nil {
+			return nil, err
+		}
+		attrs = append(attrs, attr)
+	}
+	return attrs, nil
 }
 
 // UnknownAttribute 是本解析器不认识的属性：只保留名字与长度，内容按

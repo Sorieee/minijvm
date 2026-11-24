@@ -19,5 +19,10 @@ func (a *SourceFileAttribute) Length() uint32 { return 2 }
 
 // readInfo 读取 u2 sourcefile_index。
 func (a *SourceFileAttribute) readInfo(r *ClassReader) error {
-	panic("TODO(M03): not implemented")
+	fileIndex, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	a.SourceFileIndex = fileIndex
+	return nil
 }

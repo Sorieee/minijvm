@@ -34,6 +34,10 @@ type CodeAttribute struct {
 	// 真正解析留到需要时（M04/M05 若要调试局部变量名）。
 	LocalVariableTable     []LocalVariableTableEntry
 	LocalVariableTypeTable []LocalVariableTypeTableEntry
+
+	// attrLength 是属性头里的 u4 attribute_length；readInfo(r) 拿不到它，
+	// 由 readAttributeInfo 构造本属性时回填，Length() 返回它。
+	attrLength uint32
 }
 
 // ExceptionTableEntry 是异常处理表的一项（JVM 规范 §4.7.3）。
@@ -65,13 +69,74 @@ type LocalVariableTypeTableEntry struct {
 // Name 返回属性名。
 func (a *CodeAttribute) Name() string { return "Code" }
 
-// Length 返回属性内容长度（u4）。
-func (a *CodeAttribute) Length() uint32 { panic("TODO(M03): not implemented") }
+// Length 返回属性内容长度（u4，由 readAttributeInfo 回填）。
+func (a *CodeAttribute) Length() uint32 { return a.attrLength }
 
 // readInfo 读取 Code 属性内容。
 //
 // 注意：嵌套在 Code 末尾的属性表用 readAttributes 读（那里可能出现
 // LineNumberTable / LocalVariableTable / StackMapTable 等）。
 func (a *CodeAttribute) readInfo(r *ClassReader) error {
-	panic("TODO(M03): not implemented")
+	maxStack, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	maxLocals, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	codeLength, err := r.ReadUint32()
+	if err != nil {
+		return err
+	}
+	code, err := r.ReadBytes(codeLength)
+	if err != nil {
+		return err
+	}
+
+	exceptionCount, err := r.ReadUint16()
+	if err != nil {
+		return err
+	}
+	exceptionTable := make([]ExceptionTableEntry, exceptionCount)
+	for i := 0; i < int(exceptionCount); i++ {
+		startPc, err := r.ReadUint16()
+		if err != nil {
+			return err
+		}
+		endPc, err := r.ReadUint16()
+		if err != nil {
+			return err
+		}
+		handlerPc, err := r.ReadUint16()
+		if err != nil {
+			return err
+		}
+		catchType, err := r.ReadUint16()
+		if err != nil {
+			return err
+		}
+		exceptionTable[i] = ExceptionTableEntry{
+			StartPc: startPc, EndPc: endPc, HandlerPc: handlerPc, CatchType: catchType,
+		}
+	}
+
+	// 末尾的嵌套属性表交给 readAttributes；只把 LineNumberTable 提到
+	// 专属字段（M09 用），其余（LocalVariableTable/StackMapTable 等）
+	// 按未知属性跳过即可。
+	nested, err := readAttributes(r)
+	if err != nil {
+		return err
+	}
+	for _, attr := range nested {
+		if lnt, ok := attr.(*LineNumberTableAttribute); ok {
+			a.LineNumberTable = lnt.LineNumberTable
+		}
+	}
+
+	a.MaxStack = maxStack
+	a.MaxLocals = maxLocals
+	a.Code = code
+	a.ExceptionTable = exceptionTable
+	return nil
 }
