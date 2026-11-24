@@ -113,14 +113,37 @@ func ParseXss(s string) (int, error) {
 
 // normalizeXss 把 -Xss1m 这类「值紧跟参数名」的写法改写为 -Xss=1m。
 // java 命令支持紧凑写法，但 Go 的 flag 包只认 -flag value / -flag=value。
+//
+// 只处理主类名之前的 flag 区：主类之后的一切都是程序参数，必须原样
+// 透传（否则 `Foo -Xss1m` 会被误改写成 `Foo -Xss=1m`）。
 func normalizeXss(args []string) []string {
+	// 取独立值的 flag：遇到时跳过下一个 token，避免把 flag 值误判成主类名。
+	takesValue := map[string]bool{
+		"-cp": true, "-classpath": true, "-Xjre": true, "-Xss": true, "-Xlog": true,
+	}
+
 	out := make([]string, 0, len(args))
-	for _, a := range args {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		// 第一个位置参数即主类名（或 "--" 之后的全部参数），其后原样保留。
+		if a == "--" || !strings.HasPrefix(a, "-") || a == "-" {
+			out = append(out, args[i:]...)
+			return out
+		}
 		if strings.HasPrefix(a, "-Xss") && a != "-Xss" && !strings.HasPrefix(a, "-Xss=") {
 			out = append(out, "-Xss="+strings.TrimPrefix(a, "-Xss"))
 			continue
 		}
 		out = append(out, a)
+
+		name := a
+		if idx := strings.IndexByte(a, '='); idx >= 0 {
+			name = a[:idx]
+		}
+		if takesValue[name] && !strings.Contains(a, "=") && i+1 < len(args) {
+			i++
+			out = append(out, args[i])
+		}
 	}
 	return out
 }

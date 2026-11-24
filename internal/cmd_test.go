@@ -64,6 +64,37 @@ func TestParseCmdFromFlagAfterClassIsProgramArg(t *testing.T) {
 	}
 }
 
+// 紧凑形式的 -Xss 出现在主类之后时属于程序参数，不能当 flag 解析或改写。
+func TestParseCmdFromXssAfterClassIsProgramArg(t *testing.T) {
+	cmd := ParseCmdFrom([]string{"Foo", "-Xss1m"})
+	if cmd.XssOption != "" {
+		t.Errorf("XssOption = %q, want empty（主类之后的 -Xss1m 不是 jvm flag）", cmd.XssOption)
+	}
+	if cmd.XssBytes != DefaultStackSize {
+		t.Errorf("XssBytes = %d, want DefaultStackSize = %d", cmd.XssBytes, DefaultStackSize)
+	}
+	if cmd.Class != "Foo" {
+		t.Errorf("Class = %q, want %q", cmd.Class, "Foo")
+	}
+	if len(cmd.Args) != 1 || cmd.Args[0] != "-Xss1m" {
+		t.Errorf("Args = %v, want [-Xss1m]（必须原样透传，不能改写成 -Xss=1m）", cmd.Args)
+	}
+}
+
+// 取值 flag 和主类的顺序不能打乱紧凑 -Xss 的识别（-cp 的值不是主类名）。
+func TestParseCmdFromXssAfterValueFlag(t *testing.T) {
+	cmd := ParseCmdFrom([]string{"-cp", "a;b", "-Xss512k", "Foo"})
+	if cmd.CpOption != "a;b" {
+		t.Errorf("CpOption = %q, want %q", cmd.CpOption, "a;b")
+	}
+	if cmd.XssBytes != 512*1024 {
+		t.Errorf("XssBytes = %d, want %d", cmd.XssBytes, 512*1024)
+	}
+	if cmd.Class != "Foo" {
+		t.Errorf("Class = %q, want %q", cmd.Class, "Foo")
+	}
+}
+
 // ---- ParseXss：-Xss 值 → 字节数（M01 用例 3）----
 
 func TestParseXss(t *testing.T) {
@@ -93,11 +124,11 @@ func TestParseXss(t *testing.T) {
 
 func TestParseXssInvalid(t *testing.T) {
 	cases := []string{
-		"abc",  // 非数字
-		"1x",   // 未知后缀
-		"",     // 空
-		"-1m",  // 负数
-		"0",    // 零（栈大小必须为正）
+		"abc", // 非数字
+		"1x",  // 未知后缀
+		"",    // 空
+		"-1m", // 负数
+		"0",   // 零（栈大小必须为正）
 	}
 	for _, in := range cases {
 		got, err := ParseXss(in)
